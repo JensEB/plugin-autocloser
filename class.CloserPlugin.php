@@ -286,6 +286,21 @@ class CloserPlugin extends Plugin {
         $whereFilter = ($config->get('close-only-answered')) ? ' AND isanswered=1' : '';
         $whereFilter .= ($config->get('close-only-overdue')) ? ' AND isoverdue=1' : '';
 
+        $help_topics = $config->get('help-topics'); // IDs der ausgewählten Hilfsthemen
+
+        // Extrahiere die Keys, falls es ein assoziatives Array ist
+        if (is_array($help_topics) && count($help_topics)) {
+            $topic_ids = array_keys($help_topics);
+            $topic_ids = array_filter(array_map('intval', $topic_ids));
+            if (count($topic_ids)) {
+                $topic_filter = sprintf(' AND topic_id IN (%s)', implode(',', $topic_ids));
+            } else {
+                $topic_filter = '';
+            }
+        } else {
+            $topic_filter = '';
+        }
+
         // Ticket query, note MySQL is doing all the date maths:
         // Sidebar: Why haven't we moved to PDO yet?
         /*
@@ -299,9 +314,9 @@ class CloserPlugin extends Plugin {
                 "
 SELECT ticket_id 
 FROM %s WHERE lastupdate < DATE_SUB(NOW(), INTERVAL %d DAY)
-AND status_id=%d %s
+AND status_id=%d %s %s
 ORDER BY ticket_id ASC
-LIMIT %d", TICKET_TABLE, $age_days, $from_status, $whereFilter, $max);
+LIMIT %d", TICKET_TABLE, $age_days, $from_status, $whereFilter, $topic_filter, $max);
 
         if (self::DEBUG) {
         	$this->LOG[]="Looking for tickets with query: $sql";

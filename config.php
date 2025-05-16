@@ -164,6 +164,25 @@ class CloserPluginConfig extends PluginConfig {
                     'hint' => $__(
                             'When we change the ticket, what are we changing the status from? Default is "Open"')
                         ]),
+                'help-topics' => new ChoiceField(
+                        [
+                    'id' => 'help-topics',
+                    'label' => __('Help Topics'),
+                    'choices' => (function() {
+                        if (class_exists('Topic') && method_exists('Topic', 'getHelpTopics')) {
+                            try {
+                                $topics = Topic::getHelpTopics();
+                                return $topics ?: [];
+                            } catch (Throwable $e) {
+                                return [];
+                            }
+                        }
+                        return [];
+                    })(),
+                    'configuration' => ['multiselect' => true],
+                    'default' => [],
+                    'hint' => __('Only tickets with one of these help topics will be processed. Leave empty to include all topics.')
+                        ]),
                 'to-status' => new ChoiceField(
                         [
                     'label' => $__('To Status'),
