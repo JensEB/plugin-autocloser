@@ -46,14 +46,10 @@ class CloserPluginConfig extends PluginConfig {
                         'Max Ticket age only supports numeric values.');
                 return FALSE;
             }
-            if (!(isset($config['robot-account'])) || ($config[('robot-account')]==0)) {
-            	//echo '<pre>'.print_r('robot-account'.' is not set "'.$config[('robot-account')].'"',2).'</pre>';
+            $robotAccount = intval($config['robot-account'] ?? 0);
+            $adminReply = intval($config['admin-reply'] ?? 0);
+            if (!$robotAccount && $adminReply > 0) {
                 $errors['err'] = $__('Please choose a robot-account.');
-                return FALSE;            	
-            }
-            if (!(isset($config['admin-reply'])) || ($config[('admin-reply')]==0)) {
-            	//echo '<pre>'.print_r('admin-reply'.' is not set "'.$config[('admin-reply')].'"',2).'</pre>';
-                $errors['err'] = $__('Please choose an admin-reply.');
                 return FALSE;            	
             }
 
