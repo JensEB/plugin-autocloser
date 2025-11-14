@@ -152,14 +152,6 @@ class CloserPluginConfig extends PluginConfig {
                     'label' => $__('Only change tickets past expiry date'),
                     'hint' => $__('Default ignores expiry')
                         ]),
-                'from-status' => new ChoiceField(
-                        [
-                    'label' => $__('From Status'),
-                    'choices' => $statuses,
-                    'default' => 1,
-                    'hint' => $__(
-                            'When we change the ticket, what are we changing the status from? Default is "Open"')
-                        ]),
                 'help-topics' => new ChoiceField(
                         [
                     'id' => 'help-topics',
@@ -197,6 +189,15 @@ class CloserPluginConfig extends PluginConfig {
                     'configuration' => ['multiselect' => true],
                     'default' => [],
                     'hint' => $__('Only tickets from one of these departments will be processed. Leave empty to include all departments.')
+                        ]),
+                'from-status' => new ChoiceField(
+                        [
+                    'label' => $__('From Status'),
+                    'choices' => $statuses,
+                    'configuration' => ['multiselect' => true],
+                    'default' => 1,
+                    'hint' => $__(
+                            'When we change the ticket, what are we changing the status from? Default is "Open"')
                         ]),
                 'to-status' => new ChoiceField(
                         [

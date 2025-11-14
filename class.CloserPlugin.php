@@ -265,10 +265,6 @@ class CloserPlugin extends Plugin {
      */
     private function find_ticket_ids(PluginConfig &$config) {
 	 global $ost;
-        $from_status = (int) $config->get('from-status');
-        if (!$from_status) {
-            throw new \Exception("Invalid parameter (int) from_status needs to be > 0");
-        }
 
         $age_days = (int) $config->get('purge-age');
         if ($age_days < 1) {
@@ -301,6 +297,18 @@ class CloserPlugin extends Plugin {
             }
         }
 
+        $from_status = $config->get('from-status');
+        $from_status_ids = [];
+        if(!is_array($from_status) && (int) $from_status)
+            $from_status_ids[] = (int) $from_status;
+        elseif(is_array($from_status))
+            $from_status_ids = array_filter(array_map('intval', array_keys($from_status)));
+        // extract array keys as dept_ids, if departments selected
+        if (count($from_status_ids)) {
+            $whereFilter .= sprintf(' AND status_id IN (%s)', implode(',', $from_status_ids));
+        } else
+            throw new \Exception("Invalid parameter (int) / (array) from_status needs to be > 0 or [> 0]");
+
         // Ticket query, note MySQL is doing all the date maths:
         // Sidebar: Why haven't we moved to PDO yet?
         /*
@@ -313,10 +321,9 @@ class CloserPlugin extends Plugin {
         $sql = sprintf(
                 "
 SELECT ticket_id 
-FROM %s WHERE lastupdate < DATE_SUB(NOW(), INTERVAL %d DAY)
-AND status_id=%d %s
+FROM %s WHERE lastupdate < DATE_SUB(NOW(), INTERVAL %d DAY) %s
 ORDER BY ticket_id ASC
-LIMIT %d", TICKET_TABLE, $age_days, $from_status, $whereFilter, $max);
+LIMIT %d", TICKET_TABLE, $age_days, $whereFilter, $max);
 
         if ($this->DEBUG) {
         	$this->LOG[]="Looking for tickets with query: $sql";
