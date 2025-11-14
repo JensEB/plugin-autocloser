@@ -7,8 +7,8 @@ return [
         'Last-Translator' => 'Your Name',
     ],
 
-	'Ticket Closer' => 'Automatischer Ticketschließer',
-	'Changes ticket statuses based on age.' => 'Ändert den Ticketstatus basierend auf dem Alter.',
+    'Ticket Closer' => 'Automatischer Ticketschließer',
+    'Changes ticket statuses based on age.' => 'Ändert den Ticketstatus basierend auf dem Alter.',
     // class.CloserPlugin.php
     'Error auto-changing status' => 'Fehler beim automatischen Ändern des Status',
     'Unable to change this ticket\'s status to ' => 'Der Status dieses Tickets konnte nicht geändert werden zu ',
@@ -19,7 +19,7 @@ return [
     'We were unable to post a reply to the ticket creator.' => 'Wir konnten keine Antwort an den Ticketersteller senden.',
 
     // config.php
-	'Auto-closed for being open too long with no updates.' => 'Wurde automatisch geschlossen, weil es zu lange geöffnet war, ohne dass Aktualisierungen vorgenommen wurden.',
+    'Auto-closed for being open too long with no updates.' => 'Wurde automatisch geschlossen, weil es zu lange geöffnet war, ohne dass Aktualisierungen vorgenommen wurden.',
     'Only a numeric value is valid for Purge Number.' => 'Für die Anzahl der zu bearbeitenden Tickets ist nur ein numerischer Wert gültig.',
     'Max Ticket age only supports numeric values.' => 'Das maximale Ticketalter unterstützt nur numerische Werte.',
     'Please choose a robot-account.' => 'Bitte wählen Sie ein Roboter-Konto.',
@@ -63,4 +63,7 @@ return [
     'Auto-Reply Canned Response' => 'Automatische Antwort mit einer Antwortvorlage',
     'Select a canned response to use as a reply just before closing (can use Variables), configure in /scp/canned.php' => 'Wählen Sie eine Antwortvorlage, die kurz vor dem Schließen als Antwort verwendet wird (kann Variablen enthalten). <a href="canned.php">zu den Antwortvorlagen</a>',
     'ONLY Send as Ticket\'s Assigned Agent' => 'NUR als zugewiesener Agent des Tickets senden',
+    'Debug mode' => 'Testmodus',
+    'Enable debug mode' => 'Testmodus aktivieren',
+    'Enable debug mode to get information about this instance into the syslog on every run.' => 'Aktivieren Sie den Testmodus, um bei jedem Lauf Informationen über diese Instanz in das Systemprotokoll zu schreiben.',
 ];

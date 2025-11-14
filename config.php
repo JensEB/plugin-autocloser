@@ -234,7 +234,18 @@ class CloserPluginConfig extends PluginConfig {
                     'label' => $__('Auto-Reply Canned Response'),
                     'hint' => $__(
                             'Select a canned response to use as a reply just before closing (can use Variables), configure in /scp/canned.php'),
-                    'choices' => $responses
+                    'choices' => $responses,
+                    'default' => -1,
+                        ]),
+            'debug' => new SectionBreakField(
+                    [
+                'label' => $__('Debug mode')
+                    ]),
+                'debug-mode-enabled' => new BooleanField(
+                        [
+                    'default' => FALSE,
+                    'label' => $__('Enable debug mode'),
+                    'hint' => $__('Enable debug mode to get information about this instance into the syslog on every run.')
                         ])
             ];
 

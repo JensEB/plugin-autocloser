@@ -37,7 +37,7 @@ class CloserPlugin extends Plugin {
      *
      * @var boolean
      */
-    const DEBUG = FALSE;
+    private $DEBUG = FALSE;
 
     /**
      * Keeps all log entries for each run
@@ -73,6 +73,9 @@ class CloserPlugin extends Plugin {
         // Listen for cron Signal, which only happens at end of class.cron.php:
         Signal::connect('cron', function ($ignored, $data) use (&$config, $instance) {
 
+            // enable debug mode
+            if($config->get('debug-mode-enabled')) $this->DEBUG = true;
+
             // Autocron is an admin option, we can filter out Autocron Signals
             // to ensure changing state for potentially hundreds/thousands
             // of tickets doesn't affect interactive Agent/User experience.
@@ -98,12 +101,15 @@ class CloserPlugin extends Plugin {
 	
                 try {
                     $open_ticket_ids = $this->find_ticket_ids($config);
-                    if (self::DEBUG) {
-                    		$this->LOG[]=count($open_ticket_ids) . " open tickets.";
+                    if ($this->DEBUG) {
+                    		$this->LOG[]=count($open_ticket_ids) . " tickets matched the criterias.";
                     }
 
                     // Bail if there is no work to do
                     if (!count($open_ticket_ids)) {
+                        if ($this->DEBUG)
+                            $this->print2log();
+
                         return true;
                     }
 
@@ -128,7 +134,7 @@ class CloserPlugin extends Plugin {
                         }
                     }
 
-                    if (self::DEBUG) {
+                    if ($this->DEBUG) {
                     		$this->LOG[]="Found the following details:\nAdmin Note: $admin_note\n\nAdmin Reply: $admin_reply\n";
                     }
 
@@ -178,7 +184,7 @@ class CloserPlugin extends Plugin {
                     // Well, something borked
                     $this->LOG[]="Exception encountered, we'll soldier on, but something is broken!";
                     $this->LOG[]=$e->getMessage();
-                    if (self::DEBUG) {$this->LOG[]='<pre>'.print_r($e->getTrace(),2).'</pre>';}
+                    if ($this->DEBUG) {$this->LOG[]='<pre>'.print_r($e->getTrace(),2).'</pre>';}
                     $this->print2log();
                 }
         }
@@ -213,7 +219,7 @@ class CloserPlugin extends Plugin {
         // Always run when in DEBUG mode.. because waiting for the scheduler is slow
         // If we don't have a next_run, it's because we want it to run
         // If the next run is in the past, then we are overdue, so, lets go!
-        if (self::DEBUG || !$next_run || $now > $next_run) {
+        if ($this->DEBUG || !$next_run || $now > $next_run) {
             return TRUE;
         }
         return FALSE;
@@ -231,7 +237,7 @@ class CloserPlugin extends Plugin {
      */
     private function change_ticket_status(Ticket $ticket, TicketStatus $new_status) {
 	 global $ost;
-        if (self::DEBUG) {
+        if ($this->DEBUG) {
         	$this->LOG[]=
                     "Setting status " . $new_status->getState() .
                     " for ticket {$ticket->getId()}::{$ticket->getSubject()}";
@@ -312,7 +318,7 @@ AND status_id=%d %s
 ORDER BY ticket_id ASC
 LIMIT %d", TICKET_TABLE, $age_days, $from_status, $whereFilter, $max);
 
-        if (self::DEBUG) {
+        if ($this->DEBUG) {
         	$this->LOG[]="Looking for tickets with query: $sql";
         }
 
@@ -501,7 +507,7 @@ PIECE;
             // you gotta pick one ..
             return FALSE;
         }
-        if (self::DEBUG) {
+        if ($this->DEBUG) {
         	$this->LOG[]=printf("Testing thread entry: %s : %s\n", $entry->get('type'), $entry->get('title'));
         }
         if (isset($entry->model->ht['type'])) {
