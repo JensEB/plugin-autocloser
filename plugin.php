@@ -4,7 +4,7 @@ list($__, $_N) = Plugin::translate('closer');
 
 return array(
  'id' => 'clonemeagain:autocloser', # notrans
- 'version' => '3.1.1',
+ 'version' => '3.2.0',
  'name' => /* trans */ $__('Ticket Closer'),
  'author' => 'clonemeagain@gmail.com',
  'description' => /* trans */ $__('Changes ticket statuses based on age.'),
@@ -23,6 +23,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [3.2.0] - 2025-11-14
+### Fixed
+- use osTickets native function to change ticket status
+- configuration pre-check for robot-account - only needed, if an admin-reply is set
+
+### Added
+- add language support an translation into german
+- allow more than one from-status
+- add department filter (only tickets with or without selected depts)
+- add help topic filter (only tickets with or without selected topics)
+
+### Removed
+- configuration pre-check for admin-reply - no need to check it...
 
 ## [3.1.1] - 2023-01-15
 ### Added

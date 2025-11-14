@@ -264,36 +264,44 @@ class CloserPlugin extends Plugin {
      *         logs..
      */
     private function find_ticket_ids(PluginConfig &$config) {
-	 global $ost;
 
+        // Limit
+        $max = (int) $config->get('purge-num') ?: 20;
+
+        // Filter
         $age_days = (int) $config->get('purge-age');
         if ($age_days < 1) {
             throw new \Exception("Invalid parameter (int) age_days needs to be > 0");
+        } else {
+            $whereFilter = sprintf(' lastupdate < DATE_SUB(NOW(), INTERVAL %d DAY)', $max);
         }
 
-        $max = (int) $config->get('purge-num');
-        if ($max < 1) {
-            throw new \Exception("Invalid parameter (int) max needs to be > 0");
-        }
-
-        $whereFilter = ($config->get('close-only-answered')) ? ' AND isanswered=1' : '';
+        $whereFilter .= ($config->get('close-only-answered')) ? ' AND isanswered=1' : '';
         $whereFilter .= ($config->get('close-only-overdue')) ? ' AND isoverdue=1' : '';
 
-        $help_topics = $config->get('help-topics'); // get help topic config
+        $help_topics_selector = $config->get('help-topic-selector');
+        $help_topics = $config->get('help-topics');
         // extract array keys as topic_ids, if help topics selected
         if (is_array($help_topics) && count($help_topics)) {
             $topic_ids = array_filter(array_map('intval', array_keys($help_topics)));
             if (count($topic_ids)) {
-                $whereFilter .= sprintf(' AND topic_id IN (%s)', implode(',', $topic_ids));
+                $whereFilter .= sprintf(' AND topic_id %s (%s)',
+                                        $help_topics_selector === 'i' ? 'NOT IN' : 'IN',
+                                        implode(',', $topic_ids)
+                                       );
             }
         }
 
-        $depts = $config->get('departments'); // get department config
+        $department_selector = $config->get('department-selector');
+        $depts = $config->get('departments');
         // extract array keys as dept_ids, if departments selected
         if (is_array($depts) && count($depts)) {
             $dept_ids = array_filter(array_map('intval', array_keys($depts)));
             if (count($dept_ids)) {
-                $whereFilter .= sprintf(' AND dept_id IN (%s)', implode(',', $dept_ids));
+                $whereFilter .= sprintf(' AND dept_id %s (%s)',
+                                        $department_selector === 'i' ? 'NOT IN' : 'IN',
+                                        implode(',', $dept_ids)
+                                       );
             }
         }
 
@@ -318,12 +326,9 @@ class CloserPlugin extends Plugin {
          * => 1, 'isoverdue' => 1 ))->all(); print_r($tickets);
          */
 
-        $sql = sprintf(
-                "
-SELECT ticket_id 
-FROM %s WHERE lastupdate < DATE_SUB(NOW(), INTERVAL %d DAY) %s
-ORDER BY ticket_id ASC
-LIMIT %d", TICKET_TABLE, $age_days, $whereFilter, $max);
+        $sql = sprintf("SELECT ticket_id FROM %s WHERE %s ORDER BY ticket_id ASC LIMIT %d",
+                       TICKET_TABLE, $whereFilter, $max
+                      );
 
         if ($this->DEBUG) {
         	$this->LOG[]="Looking for tickets with query: $sql";

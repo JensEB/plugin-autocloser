@@ -68,7 +68,7 @@ class CloserPluginConfig extends PluginConfig {
 
         // I'm not 100% sure that closed status has id 3 for everyone.
         // Let's just get all available Statuses and show a selectbox:
-        $responses = $staff = $statuses = [];
+        $staff = $statuses = [];
 
         // Doesn't appear to be a TicketStatus list that I want to use..
         foreach (TicketStatus::objects()->values_flat('id', 'name') as $s) {
@@ -152,6 +152,14 @@ class CloserPluginConfig extends PluginConfig {
                     'label' => $__('Only change tickets past expiry date'),
                     'hint' => $__('Default ignores expiry')
                         ]),
+                'help-topic-selector' => new ChoiceField(
+                        [
+                    'label' => sprintf($__('Consider %s'), __('Help Topics')),
+                    'choices' => ['p'=>$__('process'),'i'=>$__('ignore')],
+                    'default' => 'p',
+                    'hint' => $__(
+                            'Should tickets with these help topics be processed or ignored?')
+                        ]),
                 'help-topics' => new ChoiceField(
                         [
                     'id' => 'help-topics',
@@ -169,7 +177,15 @@ class CloserPluginConfig extends PluginConfig {
                     })(),
                     'configuration' => ['multiselect' => true],
                     'default' => [],
-                    'hint' => $__('Only tickets with one of these help topics will be processed. Leave empty to include all topics.')
+                    'hint' => $__('Only tickets with one of these help topics will be processed or ignored. Leave empty to disable this filter.')
+                        ]),
+                'department-selector' => new ChoiceField(
+                        [
+                    'label' => sprintf($__('Consider %s'), __('Departments')),
+                    'choices' => ['p'=>$__('process'),'i'=>$__('ignore')],
+                    'default' => 'p',
+                    'hint' => $__(
+                            'Should tickets from these departments be processed or ignored?')
                         ]),
                 'departments' => new ChoiceField(
                         [
@@ -188,7 +204,7 @@ class CloserPluginConfig extends PluginConfig {
                     })(),
                     'configuration' => ['multiselect' => true],
                     'default' => [],
-                    'hint' => $__('Only tickets from one of these departments will be processed. Leave empty to include all departments.')
+                    'hint' => $__('Only tickets from one of these departments will be processed or ignored. Leave empty to disable this filter.')
                         ]),
                 'from-status' => new ChoiceField(
                         [
