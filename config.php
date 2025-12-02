@@ -130,137 +130,155 @@ class CloserPluginConfig extends PluginConfig {
         // Build a group configuration:
         $config_group = [];
 
-            $config_group[] = [
-                'purge-age' => new TextboxField(
-                        [
-                    'default' => '999',
-                    'label' => $__('Max Ticket age in days'),
-                    'hint' => $__(
-                            'Tickets with no updates in this many days will match and have their status changed.'),
-                    'size' => 5,
-                    'length' => 4
-                        ]),
-                'close-only-answered' => new BooleanField(
-                        [
-                    'default' => TRUE,
-                    'label' => $__('Only change tickets with an Agent Response'),
-                    'hint' => ''
-                        ]),
-                'close-only-overdue' => new BooleanField(
-                        [
-                    'default' => FALSE,
-                    'label' => $__('Only change tickets past expiry date'),
-                    'hint' => $__('Default ignores expiry')
-                        ]),
-                'help-topic-selector' => new ChoiceField(
-                        [
-                    'label' => sprintf($__('Consider %s'), __('Help Topics')),
-                    'choices' => ['p'=>$__('process'),'i'=>$__('ignore')],
-                    'default' => 'p',
-                    'hint' => $__(
-                            'Should tickets with these help topics be processed or ignored?')
-                        ]),
-                'help-topics' => new ChoiceField(
-                        [
-                    'id' => 'help-topics',
-                    'label' => __('Help Topics'),
-                    'choices' => (function() {
-                        if (class_exists('Topic') && method_exists('Topic', 'getHelpTopics')) {
-                            try {
-                                $topics = Topic::getHelpTopics();
-                                return $topics ?: [];
-                            } catch (Throwable $e) {
-                                return [];
-                            }
-                        }
-                        return [];
-                    })(),
-                    'configuration' => ['multiselect' => true],
-                    'default' => [],
-                    'hint' => $__('Only tickets with one of these help topics will be processed or ignored. Leave empty to disable this filter.')
-                        ]),
-                'department-selector' => new ChoiceField(
-                        [
-                    'label' => sprintf($__('Consider %s'), __('Departments')),
-                    'choices' => ['p'=>$__('process'),'i'=>$__('ignore')],
-                    'default' => 'p',
-                    'hint' => $__(
-                            'Should tickets from these departments be processed or ignored?')
-                        ]),
-                'departments' => new ChoiceField(
-                        [
-                    'id' => 'departments',
-                    'label' => __('Departments'),
-                    'choices' => (function() {
-                        if (class_exists('Dept') && method_exists('Dept', 'getDepartments')) {
-                            try {
-                                $depts = Dept::getDepartments(null, true, true);
-                                return $depts ?: [];
-                            } catch (Throwable $e) {
-                                return [];
-                            }
-                        }
-                        return [];
-                    })(),
-                    'configuration' => ['multiselect' => true],
-                    'default' => [],
-                    'hint' => $__('Only tickets from one of these departments will be processed or ignored. Leave empty to disable this filter.')
-                        ]),
-                'from-status' => new ChoiceField(
-                        [
-                    'label' => $__('From Status'),
-                    'choices' => $statuses,
-                    'configuration' => ['multiselect' => true],
-                    'default' => 1,
-                    'hint' => $__(
-                            'When we change the ticket, what are we changing the status from? Default is "Open"')
-                        ]),
-                'to-status' => new ChoiceField(
-                        [
-                    'label' => $__('To Status'),
-                    'choices' => $statuses,
-                    'default' => 3, // 3 == Open on mine.
-                    'hint' => $__(
-                            'When we change the ticket, what are we changing the status to? Default is "Closed"')
-                        ]),
-                'admin-note' => new TextareaField(
-                        [
-                    'label' => $__('Auto-Note'),
-                    'hint' => $__('Create\'s an admin note just before closing.'),
-                    'default' => $__('Auto-closed for being open too long with no updates.'),
-                    'configuration' => [
-                        'html' => FALSE,
-                        'size' => 40,
-                        'length' => 256
-                    ]
-                        ]),
-                'robot-account' => new ChoiceField(
-                        [
-                    'label' => $__('Robot Account'),
-                    'choices' => $staff,
-                    'default' => 0,
-                    'hint' => $__(
-                            'Select account for sending replies, account can be locked, still works.')
-                        ]),
-                'admin-reply' => new ChoiceField(
-                        [
-                    'label' => $__('Auto-Reply Canned Response'),
-                    'hint' => $__(
-                            'Select a canned response to use as a reply just before closing (can use Variables), configure in /scp/canned.php'),
-                    'choices' => $responses,
-                    'default' => -1,
-                        ]),
-            'debug' => new SectionBreakField(
+        $config_group[] = [
+            'filter' => new SectionBreakField(
                     [
-                'label' => $__('Debug mode')
+                'label' => $__('Filter Config')
                     ]),
-                'debug-mode-enabled' => new BooleanField(
-                        [
-                    'default' => FALSE,
-                    'label' => $__('Enable debug mode'),
-                    'hint' => $__('Enable debug mode to get information about this instance into the syslog on every run.')
-                        ])
-            ];
+            'calculate-date' => new ChoiceField(
+                    [
+                'label' => $__('Calculate from date'),
+                'choices' => [
+                    'u'=>__('Last Update'),
+                    'm'=>__('Last Message'),
+                    'r'=>__('Last Response')
+                ],
+                'default' => 'u',
+                'hint' => $__('From which date should the calculation begin?')
+                    ]),
+            'purge-age' => new TextboxField(
+                    [
+                'default' => '999',
+                'label' => $__('Max Ticket age in days'),
+                'hint' => $__('Tickets whose date is before the specified days will match and have their status changed.'),
+                'size' => 5,
+                'length' => 4
+                    ]),
+            'close-only-answered' => new BooleanField(
+                    [
+                'default' => TRUE,
+                'label' => $__('Only change tickets with an Agent Response'),
+                'hint' => ''
+                    ]),
+            'close-only-overdue' => new BooleanField(
+                    [
+                'default' => FALSE,
+                'label' => $__('Only change tickets past expiry date'),
+                'hint' => $__('Default ignores expiry')
+                    ]),
+            'help-topic-selector' => new ChoiceField(
+                    [
+                'label' => sprintf($__('Consider %s'), __('Help Topics')),
+                'choices' => ['p'=>$__('process'),'i'=>$__('ignore')],
+                'default' => 'p',
+                'hint' => $__(
+                        'Should tickets with these help topics be processed or ignored?')
+                    ]),
+            'help-topics' => new ChoiceField(
+                    [
+                'id' => 'help-topics',
+                'label' => __('Help Topics'),
+                'choices' => (function() {
+                    if (class_exists('Topic') && method_exists('Topic', 'getHelpTopics')) {
+                        try {
+                            $topics = Topic::getHelpTopics();
+                            return $topics ?: [];
+                        } catch (Throwable $e) {
+                            return [];
+                        }
+                    }
+                    return [];
+                })(),
+                'configuration' => ['multiselect' => true],
+                'default' => [],
+                'hint' => $__('Only tickets with one of these help topics will be processed or ignored. Leave empty to disable this filter.')
+                    ]),
+            'department-selector' => new ChoiceField(
+                    [
+                'label' => sprintf($__('Consider %s'), __('Departments')),
+                'choices' => ['p'=>$__('process'),'i'=>$__('ignore')],
+                'default' => 'p',
+                'hint' => $__(
+                        'Should tickets from these departments be processed or ignored?')
+                    ]),
+            'departments' => new ChoiceField(
+                    [
+                'id' => 'departments',
+                'label' => __('Departments'),
+                'choices' => (function() {
+                    if (class_exists('Dept') && method_exists('Dept', 'getDepartments')) {
+                        try {
+                            $depts = Dept::getDepartments(null, true, true);
+                            return $depts ?: [];
+                        } catch (Throwable $e) {
+                            return [];
+                        }
+                    }
+                    return [];
+                })(),
+                'configuration' => ['multiselect' => true],
+                'default' => [],
+                'hint' => $__('Only tickets from one of these departments will be processed or ignored. Leave empty to disable this filter.')
+                    ]),
+            'from-status' => new ChoiceField(
+                    [
+                'label' => $__('From Status'),
+                'choices' => $statuses,
+                'configuration' => ['multiselect' => true],
+                'default' => 1,
+                'hint' => $__(
+                        'When we change the ticket, what are we changing the status from? Default is "Open"')
+                    ]),
+            'actions' => new SectionBreakField(
+                    [
+                'label' => $__('Actions Config')
+                    ]),
+            'to-status' => new ChoiceField(
+                    [
+                'label' => $__('To Status'),
+                'choices' => $statuses,
+                'default' => 3, // 3 == Open on mine.
+                'hint' => $__(
+                        'When we change the ticket, what are we changing the status to? Default is "Closed"')
+                    ]),
+            'admin-note' => new TextareaField(
+                    [
+                'label' => $__('Auto-Note'),
+                'hint' => $__('Create\'s an admin note just before closing.'),
+                'default' => $__('Auto-closed for being open too long with no updates.'),
+                'configuration' => [
+                    'html' => FALSE,
+                    'size' => 40,
+                    'length' => 256
+                ]
+                    ]),
+            'robot-account' => new ChoiceField(
+                    [
+                'label' => $__('Robot Account'),
+                'choices' => $staff,
+                'default' => 0,
+                'hint' => $__(
+                        'Select account for sending replies, account can be locked, still works.')
+                    ]),
+            'admin-reply' => new ChoiceField(
+                    [
+                'label' => $__('Auto-Reply Canned Response'),
+                'hint' => $__(
+                        'Select a canned response to use as a reply just before closing (can use Variables), configure in /scp/canned.php'),
+                'choices' => $responses,
+                'default' => -1,
+                    ]),
+        'debug' => new SectionBreakField(
+                [
+            'label' => $__('Debug mode')
+                ]),
+            'debug-mode-enabled' => new BooleanField(
+                    [
+                'default' => FALSE,
+                'label' => $__('Enable debug mode'),
+                'hint' => $__('Enable debug mode to get information about this instance into the syslog on every run.')
+                    ])
+        ];
 
         if (version_compare(PHP_VERSION, '5.6.0') >= 0) {
             // Merge all the group configurations into the global settings array and return as the config

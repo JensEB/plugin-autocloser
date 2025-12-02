@@ -269,42 +269,60 @@ class CloserPlugin extends Plugin {
         $max = (int) $config->get('purge-num') ?: 20;
 
         // Filter
+
+        #### time span ###
+        $cDates = [
+            'u' => 't.lastupdate',      // from ticket table
+            'm' => 'th.lastmessage',    // from thread table
+            'r' => 'th.lastresponse',   // from thread table
+        ];
+        $calculate_date = $config->get('calculate-date');
+        if(!in_array($calculate_date, ['u','m','r'])) $calculate_date = 'u';
         $age_days = (int) $config->get('purge-age');
         if ($age_days < 1) {
             throw new \Exception("Invalid parameter (int) age_days needs to be > 0");
         } else {
-            $whereFilter = sprintf(' lastupdate < DATE_SUB(NOW(), INTERVAL %d DAY)', $age_days);
+            // do we need a left join?
+            $leftJoins = '';
+            if(in_array($calculate_date, ['m','r']))
+                $leftJoins = sprintf(" LEFT JOIN `%s` th ON (t.ticket_id = th.object_id AND th.object_type = 'T') ", THREAD_TABLE);
+            $whereFilter = sprintf(' %s < DATE_SUB(NOW(), INTERVAL %d DAY)', $cDates[$calculate_date], $age_days);
         }
 
-        $whereFilter .= ($config->get('close-only-answered')) ? ' AND isanswered=1' : '';
-        $whereFilter .= ($config->get('close-only-overdue')) ? ' AND isoverdue=1' : '';
+        #### only answered ###
+        $whereFilter .= ($config->get('close-only-answered')) ? ' AND t.isanswered=1' : '';
+        #### only overdue ###
+        $whereFilter .= ($config->get('close-only-overdue')) ? ' AND t.isoverdue=1' : '';
 
+        ### help topic filter ###
         $help_topics_selector = $config->get('help-topic-selector'); // p=process, i=ignore
         $help_topics = $config->get('help-topics');
         // extract array keys as topic_ids, if help topics selected
         if (is_array($help_topics) && count($help_topics)) {
             $topic_ids = array_filter(array_map('intval', array_keys($help_topics)));
             if (count($topic_ids)) {
-                $whereFilter .= sprintf(' AND topic_id %s (%s)',
+                $whereFilter .= sprintf(' AND t.topic_id %s (%s)',
                                         $help_topics_selector === 'i' ? 'NOT IN' : 'IN',
                                         implode(',', $topic_ids)
                                        );
             }
         }
 
+        ### departments filter ###
         $department_selector = $config->get('department-selector'); // p=process, i=ignore
         $depts = $config->get('departments');
         // extract array keys as dept_ids, if departments selected
         if (is_array($depts) && count($depts)) {
             $dept_ids = array_filter(array_map('intval', array_keys($depts)));
             if (count($dept_ids)) {
-                $whereFilter .= sprintf(' AND dept_id %s (%s)',
+                $whereFilter .= sprintf(' AND t.dept_id %s (%s)',
                                         $department_selector === 'i' ? 'NOT IN' : 'IN',
                                         implode(',', $dept_ids)
                                        );
             }
         }
 
+        ### status filter ###
         $from_status = $config->get('from-status');
         $from_status_ids = [];
         if(!is_array($from_status) && (int) $from_status)
@@ -313,7 +331,7 @@ class CloserPlugin extends Plugin {
             $from_status_ids = array_filter(array_map('intval', array_keys($from_status)));
         // extract array keys as dept_ids, if departments selected
         if (count($from_status_ids)) {
-            $whereFilter .= sprintf(' AND status_id IN (%s)', implode(',', $from_status_ids));
+            $whereFilter .= sprintf(' AND t.status_id IN (%s)', implode(',', $from_status_ids));
         } else
             throw new \Exception("Invalid parameter (int) / (array) from_status needs to be > 0 or [> 0]");
 
@@ -326,8 +344,11 @@ class CloserPlugin extends Plugin {
          * => 1, 'isoverdue' => 1 ))->all(); print_r($tickets);
          */
 
-        $sql = sprintf("SELECT ticket_id FROM %s WHERE %s ORDER BY ticket_id ASC LIMIT %d",
-                       TICKET_TABLE, $whereFilter, $max
+        $sql = sprintf("SELECT t.ticket_id FROM %s %s WHERE %s ORDER BY t.ticket_id ASC LIMIT %d",
+                       TICKET_TABLE.' t',
+                       $leftJoins,
+                       $whereFilter,
+                       $max
                       );
 
         if ($this->DEBUG) {
