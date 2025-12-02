@@ -273,13 +273,13 @@ class CloserPlugin extends Plugin {
         if ($age_days < 1) {
             throw new \Exception("Invalid parameter (int) age_days needs to be > 0");
         } else {
-            $whereFilter = sprintf(' lastupdate < DATE_SUB(NOW(), INTERVAL %d DAY)', $max);
+            $whereFilter = sprintf(' lastupdate < DATE_SUB(NOW(), INTERVAL %d DAY)', $age_days);
         }
 
         $whereFilter .= ($config->get('close-only-answered')) ? ' AND isanswered=1' : '';
         $whereFilter .= ($config->get('close-only-overdue')) ? ' AND isoverdue=1' : '';
 
-        $help_topics_selector = $config->get('help-topic-selector');
+        $help_topics_selector = $config->get('help-topic-selector'); // p=process, i=ignore
         $help_topics = $config->get('help-topics');
         // extract array keys as topic_ids, if help topics selected
         if (is_array($help_topics) && count($help_topics)) {
@@ -292,7 +292,7 @@ class CloserPlugin extends Plugin {
             }
         }
 
-        $department_selector = $config->get('department-selector');
+        $department_selector = $config->get('department-selector'); // p=process, i=ignore
         $depts = $config->get('departments');
         // extract array keys as dept_ids, if departments selected
         if (is_array($depts) && count($depts)) {
