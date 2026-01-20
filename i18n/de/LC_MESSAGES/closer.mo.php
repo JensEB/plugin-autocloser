@@ -1,22 +1,35 @@
 <?php
 return [
-    // Header-Informationen (optional, aber gute Praxis)
+    // Header-Informationen
     '' => [
         'plural-forms' => 'nplurals=2; plural=(n != 1);',
         'Language' => 'de',
-        'Last-Translator' => 'Your Name',
+        'Last-Translator' => 'Jens Eberle - osticket.com.de',
     ],
 
-    'Ticket Closer' => 'Automatischer Ticketschließer',
-    'Changes ticket statuses based on age.' => 'Ändert den Ticketstatus basierend auf dem Alter.',
     // class.CloserPlugin.php
+    '%s tickets matched the criterias.' => '%s Tickets entsprechen den Kriterien.',
+    'No valid status ID: %d' => 'Keine gültige Status-ID: %d',
+    "Found the following details:\nAdmin Note: %s\n\nCanned Reply: %s\n" => "Folgende Details gefunden:\nAdmin-Notiz: %s\n\nAutomatische Antwort: %s\n",
+    'Ticket with ID %d not found. :-(' => 'Ticket mit ID %d nicht gefunden. :-(',
     'Error auto-changing status' => 'Fehler beim automatischen Ändern des Status',
-    'Unable to change this ticket\'s status to ' => 'Der Status dieses Tickets konnte nicht geändert werden zu ',
-    'Changing status to: ' => 'Status ändern zu: ',
+    "Error set status for ticket #%s (ID: %d)\n\nError: %s\n" => "Fehler beim Setzen des Status für Ticket #%s (ID: %d)\n\nFehler: %s\n",
+    'Unable to set status' => 'Setzen des Status nicht möglich',
+    'Unable to change this ticket\'s status to %s' => 'Der Status dieses Tickets konnte nicht zu %s geändert werden',
+    'Changing status to %s' => 'Status ändern zu %s',
+    "Exception encountered, we'll soldier on, but something is broken!" => 'Es ist eine Ausnahme aufgetreten, wir machen weiter, aber irgendetwas ist kaputt!',
+    'Setting status %s (%s) for ticket with ID %d :: %s' => 'Setze Status %s (%s) für Ticket mit ID %d :: %s',
+    'Invalid parameter (int) age_days needs to be > 0' => 'Ungültiger Parameter (int) age_days muss > 0 sein',
+    'Looking for tickets with query: %s' => 'Suche nach Tickets mit folgender Abfrage: %s',
     'AutoCloser Error' => 'AutoCloser-Fehler',
-    'Unable to send reply, no assigned Agent on ticket, and no Robot account specified in config.' => 'Antwort konnte nicht gesendet werden. Dem Ticket ist kein Agent zugewiesen und in der Konfiguration ist kein Roboter-Konto angegeben.',
+    'Unable to send reply. No assigned Agent on ticket and no Robot account specified in config.' => 'Antwort konnte nicht gesendet werden. Dem Ticket ist kein Agent zugewiesen und in der Konfiguration ist kein Roboter-Konto angegeben.',
     'Error Notification' => 'Fehlerbenachrichtigung',
     'We were unable to post a reply to the ticket creator.' => 'Wir konnten keine Antwort an den Ticketersteller senden.',
+    'Sent Date' => 'Sendedatum',
+    'Received Date' => 'Empfangsdatum',
+    "Testing thread entry: %s : %s\n" => "Teste Verlaufseintrag: %s : %s\n",
+    '%s has been uninstalled' => '%s wurde deinstalliert',
+    'You wanted that right?' => 'Das wollten Sie doch, oder?',
 
     // config.php
     'Auto-closed for being open too long with no updates.' => 'Wurde automatisch geschlossen, weil es zu lange geöffnet war, ohne dass Aktualisierungen vorgenommen wurden.',
@@ -47,7 +60,9 @@ return [
     'Max Ticket age in days' => 'Maximales Ticketalter in Tagen',
     'Tickets whose date is before the specified days will match and have their status changed.' => 'Tickets, deren Datum vor den angegebenen Tagen liegt, werden berücksichtigt und ihr Status wird geändert.',
     'Only change tickets with an Agent Response' => 'Nur beantwortete Tickets ändern',
+    'Checks the answered flag' => 'Prüft das Beantwortet-Flag',
     'Only change tickets past expiry date' => 'Nur überfällige Tickets ändern',
+    'Checks the overdue flag' => 'Prüft das Beantwortet-Flag',
     'Default ignores expiry' => 'Standardmäßig wird die Fälligkeit ignoriert',
     'Calculate from date' => 'Datum für Berechnung',
     'From which date should the calculation begin?' => 'Ab welchem ​​Datum soll die Berechnung beginnen?',
@@ -75,4 +90,8 @@ return [
     'Debug mode' => 'Testmodus',
     'Enable debug mode' => 'Testmodus aktivieren',
     'Enable debug mode to get information about this instance into the syslog on every run.' => 'Aktivieren Sie den Testmodus, um bei jedem Lauf Informationen über diese Instanz in das Systemprotokoll zu schreiben.',
+
+    // plugin.php
+    'Ticket Closer' => 'Automatischer Ticketschließer',
+    'Changes ticket statuses based on age.' => 'Ändert den Ticketstatus basierend auf dem Alter.',
 ];

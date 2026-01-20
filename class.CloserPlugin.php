@@ -45,7 +45,7 @@ class CloserPlugin extends Plugin {
      *
      * @var array
      */
-    private $LOG = array();
+    private $LOG = [];
 
     /**
      * The name that appears in threads as: Closer Plugin.
@@ -96,97 +96,116 @@ class CloserPlugin extends Plugin {
      * pleasure. ... there's just one catch.
      */
     private function logans_run_mode(&$config) {
-	global $ost;
-        if ($this->is_time_to_run($config)) {
-	
-                try {
-                    $open_ticket_ids = $this->find_ticket_ids($config);
-                    if ($this->DEBUG) {
-                    		$this->LOG[]=count($open_ticket_ids) . " tickets matched the criterias.";
-                    }
 
-                    // Bail if there is no work to do
-                    if (!count($open_ticket_ids)) {
-                        if ($this->DEBUG)
-                            $this->print2log();
+        if (!$this->is_time_to_run($config))
+            return true;
 
-                        return true;
-                    }
+        list ($__, $_N) = self::translate('closer');
 
-                    // Find the new TicketStatus from the Setting config:
-                    $new_status = TicketStatus::lookup(
-                                    array(
-                                        'id' => (int) $config->get('to-status')
-                    ));
+        try {
+            $open_ticket_ids = $this->find_ticket_ids($config);
+            if ($this->DEBUG) {
+                $this->LOG[]=sprintf($__('%s tickets matched the criterias.'), count($open_ticket_ids));
+            }
 
-                    // Admin note is just text
-                    $admin_note = $config->get('admin-note') ?: FALSE;
-
-                    // Fetch the actual content of the reply, "html" means load with images, 
-                    // I don't think it works with attachments though.
-                    $admin_reply = $config->get('admin-reply');
-                    if (is_numeric($admin_reply) && $admin_reply) {
-                        // We have a valid Canned_Response ID, fetch the actual Canned:
-                        $admin_reply = Canned::lookup($admin_reply);
-                        if ($admin_reply instanceof Canned) {
-                            // Got a real Canned object, let's pull the body/string:
-                            $admin_reply = $admin_reply->getFormattedResponse('html');
-                        }
-                    }
-
-                    if ($this->DEBUG) {
-                    		$this->LOG[]="Found the following details:\nAdmin Note: $admin_note\n\nAdmin Reply: $admin_reply\n";
-                    }
-
-                    // Get the robot for this config
-                    $robot = $config->get('robot-account');
-                    $robot = ($robot>0)? $robot = Staff::lookup($robot) : null;
-
-                    // Go through each ticket ID:
-                    foreach ($open_ticket_ids as $ticket_id) {
-
-                        // Fetch ticket as an Object
-                        $ticket = Ticket::lookup($ticket_id);
-                        if (!$ticket instanceof Ticket) {
-	                        $this->LOG[]="Ticket $ticket_id was not instatiable. :-(";
-                            continue;
-                        }
-
-                        // Some tickets aren't closeable.. either because of open tasks, or missing fields.
-                        // we can therefore only work on closeable tickets.
-                        // This won't close it, nor will it send a response, so it will likely trigger again
-                        // on the next run.. TRUE means send an alert.
-                        if (!$ticket->isCloseable()) {
-                            $ticket->LogNote(__('Error auto-changing status'), __(
-                                            'Unable to change this ticket\'s status to ' .
-                                            $new_status->getState()), self::PLUGIN_NAME, TRUE);
-                            continue;
-                        }
-
-                        // Add a Note to the thread indicating it was closed by us, don't send an alert.
-                        if ($admin_note) {
-                            $ticket->LogNote(
-                                    __('Changing status to: ' . $new_status->getState()), $admin_note, self::PLUGIN_NAME, FALSE);
-                        }
-
-                        // Post a Reply to the user, telling them the ticket is closed, relates to issue #2
-                        if ($admin_reply) {
-                            $this->post_reply($ticket, $new_status, $admin_reply, $robot);
-                        }
-
-                        // Actually change the ticket status
-                        $this->change_ticket_status($ticket, $new_status);
-                    }
-
+            // Bail if there is no work to do
+            if (!count($open_ticket_ids)) {
+                if ($this->DEBUG)
                     $this->print2log();
-                        
-                } catch (Exception $e) {
-                    // Well, something borked
-                    $this->LOG[]="Exception encountered, we'll soldier on, but something is broken!";
-                    $this->LOG[]=$e->getMessage();
-                    if ($this->DEBUG) {$this->LOG[]='<pre>'.print_r($e->getTrace(),2).'</pre>';}
-                    $this->print2log();
+
+                return true;
+            }
+
+            // Find the new TicketStatus from the Setting config:
+            $new_status_config = (int) $config->get('to-status');
+            if(!($new_status = TicketStatus::lookup(['id' => $new_status_config])) ) {
+                if ($this->DEBUG) {
+                    $this->LOG[]=sprintf($__('No valid status ID: %d'), $new_status_config);
                 }
+                return false;
+            }
+
+            // Admin note is just text
+            $admin_note = $config->get('admin-note') ?: FALSE;
+
+            // Fetch the actual content of the reply, "html" means load with images, 
+            // I don't think it works with attachments though.
+            $admin_reply_config = $config->get('admin-reply');
+            $admin_reply = null;
+            if (is_numeric($admin_reply_config) && $admin_reply_config) {
+                // We have a valid Canned_Response ID, fetch the actual Canned:
+                if (   ($admin_reply_config = Canned::lookup($admin_reply_config))
+                    && $admin_reply_config instanceof Canned
+                   ) {
+                    // Got a real Canned object, let's pull the body/string:
+                    $admin_reply = $admin_reply_config->getFormattedResponse('html');
+                }
+            }
+
+            if ($this->DEBUG) {
+                $this->LOG[]=sprintf($__("Found the following details:\nAdmin Note: %s\n\nCanned Reply: %s\n"), $admin_note, $admin_reply);
+            }
+
+            // Get the robot for this config
+            $robot_config = (int) $config->get('robot-account');
+            $robot = ($robot_config > 0) ? Staff::lookup($robot_config) : null;
+
+            // Go through each ticket ID:
+            foreach ($open_ticket_ids as $ticket_id) {
+
+                // Fetch ticket as an Object
+                $ticket = Ticket::lookup($ticket_id);
+                if (!$ticket || !$ticket instanceof Ticket) {
+                    $this->LOG[]=sprintf($__('Ticket with ID %d not found. :-('), $ticket_id);
+                    continue;
+                }
+
+                // Some tickets aren't closeable.. either because of open tasks, or missing fields.
+                // we can therefore only work on closeable tickets.
+                // This won't close it, nor will it send a response, so it will likely trigger again
+                // on the next run.. TRUE means send an alert.
+                if ($new_status->getState() == 'closed' && ($warn = $ticket->isCloseable()) !== true) {
+                    $msg = sprintf("%s\n%s"
+                                            ,sprintf($__('Unable to change this ticket\'s status to %s'), $new_status->getLocalName())
+                                            ,$warn
+                                            );
+                    $ticket->LogNote($__('Error auto-changing status'), $msg, self::PLUGIN_NAME, TRUE);
+                    if ($this->DEBUG) {
+                        $this->LOG[]=sprintf($__("Error set status for ticket #%s (ID: %d)\n\nError: %s\n"), $ticket->getNumber(), $ticket_id, $msg);
+                    }
+                    continue;
+                }
+
+
+                // Actually change the ticket status
+                if(!$this->change_ticket_status($ticket, $new_status)) {
+                    if ($this->DEBUG) {
+                        $msg = $__('Unable to set status');
+                        $this->LOG[]=sprintf($__("Error set status for ticket #%s (ID: %d)\n\nError: %s\n"), $ticket->getNumber(), $ticket_id, $msg);
+                    }
+                    continue;
+                }
+
+                // Add a Note to the thread indicating it was closed by us, don't send an alert.
+                if ($admin_note) {
+                    $ticket->LogNote(sprintf($__('Changing status to %s'), $new_status->getLocalName())
+                                    ,$admin_note, self::PLUGIN_NAME, FALSE);
+                }
+
+                // Post a Reply to the user, telling them the ticket is closed, relates to issue #2
+                if ($admin_reply) {
+                    $this->post_reply($ticket, $new_status, $admin_reply, $robot);
+                }
+            }
+
+            $this->print2log();
+
+        } catch (Exception $e) {
+            // Well, something borked
+            $this->LOG[]=$__("Exception encountered, we'll soldier on, but something is broken!");
+            $this->LOG[]=$e->getMessage();
+            if ($this->DEBUG) {$this->LOG[]='<pre>'.print_r($e->getTrace(),2).'</pre>';}
+            $this->print2log();
         }
     }
 
@@ -236,11 +255,15 @@ class CloserPlugin extends Plugin {
      * @param TicketStatus $new_status
      */
     private function change_ticket_status(Ticket $ticket, TicketStatus $new_status) {
-	 global $ost;
+	list ($__, $_N) = self::translate('closer');
+
         if ($this->DEBUG) {
-        	$this->LOG[]=
-                    "Setting status " . $new_status->getState() .
-                    " for ticket {$ticket->getId()}::{$ticket->getSubject()}";
+        	$this->LOG[]=sprintf($__('Setting status %s (%s) for ticket with ID %d :: %s')
+                                    ,$new_status->getLocalName()
+                                    ,$new_status->getState()
+                                    ,$ticket->getId()
+                                    ,$ticket->getSubject()
+                             );
         }
 
         // set the new status
@@ -248,10 +271,10 @@ class CloserPlugin extends Plugin {
         $errors = [];
         $set_closing_agent = false;
         $force_close = false;
-        $ticket->setStatus($new_status, $comments, $errors, $set_closing_agent, $force_close);
 
-        // Save it, flag prevents it refetching the ticket data straight away (inefficient)
-        $ticket->save(FALSE);
+        return $ticket->setStatus($new_status, $comments, $errors, $set_closing_agent, $force_close)
+               // Save it, flag prevents it refetching the ticket data straight away (inefficient)
+               && $ticket->save(FALSE);
     }
 
     /**
@@ -264,6 +287,7 @@ class CloserPlugin extends Plugin {
      *         logs..
      */
     private function find_ticket_ids(PluginConfig &$config) {
+	list ($__, $_N) = self::translate('closer');
 
         // Limit
         $max = (int) $config->get('purge-num') ?: 20;
@@ -280,7 +304,7 @@ class CloserPlugin extends Plugin {
         if(!in_array($calculate_date, ['u','m','r'])) $calculate_date = 'u';
         $age_days = (int) $config->get('purge-age');
         if ($age_days < 1) {
-            throw new \Exception("Invalid parameter (int) age_days needs to be > 0");
+            throw new \Exception($__('Invalid parameter (int) age_days needs to be > 0'));
         } else {
             // do we need a left join?
             $leftJoins = '';
@@ -352,7 +376,7 @@ class CloserPlugin extends Plugin {
                       );
 
         if ($this->DEBUG) {
-        	$this->LOG[]="Looking for tickets with query: $sql";
+        	$this->LOG[]=sprintf($__('Looking for tickets with query: %s'), $sql);
         }
 
         $r = db_query($sql);
@@ -375,7 +399,8 @@ class CloserPlugin extends Plugin {
      */
     function post_reply(Ticket $ticket, TicketStatus $new_status, $admin_reply, Staff $robot = null) {
         // We need to override this for the notifications
-        global $ost, $thisstaff;
+        global $thisstaff;
+	    list ($__, $_N) = self::translate('closer');
 
         if ($robot) {
             $assignee = $robot;
@@ -383,8 +408,9 @@ class CloserPlugin extends Plugin {
             $assignee = $ticket->getAssignee();
             if (!$assignee instanceof Staff) {
                 // Nobody, or a Team was assigned, and we haven't been told to use a Robot account.
-                $ticket->logNote(__('AutoCloser Error'), __(
-                                'Unable to send reply, no assigned Agent on ticket, and no Robot account specified in config.'), self::PLUGIN_NAME, FALSE);
+                $ticket->logNote($__('AutoCloser Error')
+                                , $__('Unable to send reply. No assigned Agent on ticket and no Robot account specified in config.')
+                                , self::PLUGIN_NAME, FALSE);
                 return;
             }
         }
@@ -424,7 +450,7 @@ class CloserPlugin extends Plugin {
 
         // Send the alert without claiming the ticket on our assignee's behalf.
         if (!$sent = $ticket->postReply($vars, $errors, TRUE, FALSE)) {
-            $ticket->LogNote(__('Error Notification'), __('We were unable to post a reply to the ticket creator.'), self::PLUGIN_NAME, FALSE);
+            $ticket->LogNote($__('Error Notification'), $__('We were unable to post a reply to the ticket creator.'), self::PLUGIN_NAME, FALSE);
         }
     }
 
@@ -507,7 +533,9 @@ class CloserPlugin extends Plugin {
      * @return string
      */
     private function render_thread_entry(AnnotatedModel $entry) {
-        $from = ($entry->get('type') == 'R') ? 'Sent' : 'Received';
+        list ($__, $_N) = self::translate('closer');
+
+        $from = ($entry->get('type') == 'R') ? $__('Sent Date') : $__('Received Date');
         $tag = ($entry->get('format') == 'text') ? 'pre' : 'p';
         $when = Format::datetime(strtotime($entry->get('created')));
         // TODO: Maybe make this a CannedResponse or admin template? 
@@ -515,7 +543,7 @@ class CloserPlugin extends Plugin {
 <hr />
 <p class="thread">
   <h3>{$entry->get('title')}</h3>
-  <p>$from Date: $when</p>
+  <p>$from: $when</p>
   <$tag>{$entry->get('body')}</$tag>
 </p>
 PIECE;
@@ -533,6 +561,8 @@ PIECE;
      * @return boolean
      */
     private function is_valid_thread_entry(AnnotatedModel $entry, $message = FALSE, $response = FALSE) {
+        list ($__, $_N) = self::translate('closer');
+
         if (!$entry->model instanceof ThreadEntry) {
             return FALSE;
         }
@@ -541,7 +571,7 @@ PIECE;
             return FALSE;
         }
         if ($this->DEBUG) {
-        	$this->LOG[]=printf("Testing thread entry: %s : %s\n", $entry->get('type'), $entry->get('title'));
+        	$this->LOG[]=printf($__("Testing thread entry: %s : %s\n"), $entry->get('type'), $entry->get('title'));
         }
         if (isset($entry->model->ht['type'])) {
             if ($response && $entry->get('type') == 'R') {
@@ -563,9 +593,11 @@ PIECE;
      * @see Plugin::uninstall()
      */
     function uninstall(&$errors) {
+        list ($__, $_N) = self::translate('closer');
+
         global $ost;
         // Send an alert to the system admin:
-        $ost->alertAdmin(self::PLUGIN_NAME . ' has been uninstalled', "You wanted that right?", true);
+        $ost->alertAdmin(sprintf($__('%s has been uninstalled'), self::PLUGIN_NAME), $__('You wanted that right?'), true);
 
         parent::uninstall($errors);
     }
@@ -585,7 +617,9 @@ PIECE;
     	 global $ost;
     	 if (empty($this->LOG)) {return false;}
  	 $msg='';
- 	 foreach($this->LOG as $key=>$value) {$msg.=$value.'<br>';}
+ 	 foreach($this->LOG as $key=>$value) {$msg.=$value."\n";}
 	 $ost->logWarning(self::PLUGIN_NAME, $msg, false);
+         // reset LOG
+         $this->LOG = [];
     }
 }

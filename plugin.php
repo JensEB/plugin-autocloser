@@ -4,7 +4,7 @@ list($__, $_N) = Plugin::translate('closer');
 
 return array(
  'id' => 'clonemeagain:autocloser', # notrans
- 'version' => '3.3.0',
+ 'version' => '3.3.1',
  'name' => /* trans */ $__('Ticket Closer'),
  'author' => 'clonemeagain@gmail.com',
  'description' => /* trans */ $__('Changes ticket statuses based on age.'),
@@ -23,6 +23,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [3.3.1] - 2025-12-16
+### Fixed
+- log correct note, if ticket isn't closeable with its cause
+- send admin-note and admin-reply only, if status ist set
+- use status name in notes instead of status state
+- make some logical changes in ticket processing
+### Added
+- translate texts for class.CloserPlugin.php
+- config: add hint for answered flag and overdue flag
+- extend debug messages
 
 ## [3.3.0] - 2025-12-02
 ### Added

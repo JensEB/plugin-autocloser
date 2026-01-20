@@ -158,13 +158,13 @@ class CloserPluginConfig extends PluginConfig {
                     [
                 'default' => TRUE,
                 'label' => $__('Only change tickets with an Agent Response'),
-                'hint' => ''
+                'hint' => $__('Checks the answered flag')
                     ]),
             'close-only-overdue' => new BooleanField(
                     [
                 'default' => FALSE,
                 'label' => $__('Only change tickets past expiry date'),
-                'hint' => $__('Default ignores expiry')
+                'hint' => $__('Default ignores expiry').' ('.$__('Checks the overdue flag').')'
                     ]),
             'help-topic-selector' => new ChoiceField(
                     [
