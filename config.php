@@ -76,6 +76,7 @@ class CloserPluginConfig extends PluginConfig {
             $statuses[$id] = $name;
         }
         // Build array of Agents
+        $staff[-2] = $__('SYSTEM');
         $staff[-1] = $__('ONLY Send as Ticket\'s Assigned Agent');
         foreach (Staff::objects() as $s) {
             $staff[$s->getId()] = (string) $s->getName();

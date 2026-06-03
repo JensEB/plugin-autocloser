@@ -63,18 +63,19 @@ class CloserPlugin extends Plugin {
      * @see Plugin::bootstrap()
      */
     public function bootstrap() {
-	// ---------------------------------------------------------------------
-	// Fetch the config
-	// ---------------------------------------------------------------------
-	// Save config and instance for use later in the signal, when it is called
-	$config = $this->config;
-	$instance = $this->config->instance;
+        // ---------------------------------------------------------------------
+        // Fetch the config
+        // ---------------------------------------------------------------------
+        // Save config and instance for use later in the signal, when it is called
+        $config = $this->config;
+        $instance = $this->config->instance;
 
         // Listen for cron Signal, which only happens at end of class.cron.php:
         Signal::connect('cron', function ($ignored, $data) use (&$config, $instance) {
 
-            // enable debug mode
-            if($config->get('debug-mode-enabled')) $this->DEBUG = true;
+            // set debug mode (reset debug vars)
+            $this->DEBUG = (bool) $config->get('debug-mode-enabled');
+            $this->LOG   = [];
 
             // Autocron is an admin option, we can filter out Autocron Signals
             // to ensure changing state for potentially hundreds/thousands
@@ -148,7 +149,7 @@ class CloserPlugin extends Plugin {
 
             // Get the robot for this config
             $robot_config = (int) $config->get('robot-account');
-            $robot = ($robot_config > 0) ? Staff::lookup($robot_config) : null;
+            $robot = ($robot_config > 0) ? Staff::lookup($robot_config) : $robot_config;
 
             // Go through each ticket ID:
             foreach ($open_ticket_ids as $ticket_id) {
@@ -166,16 +167,15 @@ class CloserPlugin extends Plugin {
                 // on the next run.. TRUE means send an alert.
                 if ($new_status->getState() == 'closed' && ($warn = $ticket->isCloseable()) !== true) {
                     $msg = sprintf("%s\n%s"
-                                            ,sprintf($__('Unable to change this ticket\'s status to %s'), $new_status->getLocalName())
-                                            ,$warn
-                                            );
+                                   ,sprintf($__('Unable to change this ticket\'s status to %s'), $new_status->getLocalName())
+                                    ,$warn
+                    );
                     $ticket->LogNote($__('Error auto-changing status'), $msg, self::PLUGIN_NAME, TRUE);
                     if ($this->DEBUG) {
                         $this->LOG[]=sprintf($__("Error set status for ticket #%s (ID: %d)\n\nError: %s\n"), $ticket->getNumber(), $ticket_id, $msg);
                     }
                     continue;
                 }
-
 
                 // Actually change the ticket status
                 if(!$this->change_ticket_status($ticket, $new_status)) {
@@ -231,7 +231,7 @@ class CloserPlugin extends Plugin {
         $next_run = 0;
 
         // Convert purge frequency to a comparable format to timestamps:
-	 $fr=($config->get('frequency') > 0) ? $config->get('frequency') : 0;
+        $fr=($config->get('frequency') > 0) ? $config->get('frequency') : 0;
         if ($freq_in_config = (int) $fr) {
             // Calculate when we want to run next, config hours into seconds,
             // plus the last run is the timestamp of the next scheduled run
@@ -259,10 +259,10 @@ class CloserPlugin extends Plugin {
      * @param TicketStatus $new_status
      */
     private function change_ticket_status(Ticket $ticket, TicketStatus $new_status) {
-	list ($__, $_N) = self::translate('closer');
+        list ($__, $_N) = self::translate('closer');
 
         if ($this->DEBUG) {
-        	$this->LOG[]=sprintf($__('Setting status %s (%s) for ticket with ID %d :: %s')
+            $this->LOG[]=sprintf($__('Setting status %s (%s) for ticket with ID %d :: %s')
                                     ,$new_status->getLocalName()
                                     ,$new_status->getState()
                                     ,$ticket->getId()
@@ -285,13 +285,11 @@ class CloserPlugin extends Plugin {
      * Retrieves an array of ticket_id's from the database
      *
      * @param PluginConfig $config
-     * @return array of integers that are Ticket::lookup compatible ID's of Open
-     *         Tickets
-     * @throws Exception so you have something interesting to read in your cron
-     *         logs..
+     * @return array of integers that are Ticket::lookup compatible ID's of Open Tickets
+     * @throws Exception so you have something interesting to read in your cron logs..
      */
     private function find_ticket_ids(PluginConfig &$config) {
-	list ($__, $_N) = self::translate('closer');
+        list ($__, $_N) = self::translate('closer');
 
         // Limit
         $max = (int) $config->get('purge-num') ?: 20;
@@ -383,7 +381,7 @@ class CloserPlugin extends Plugin {
                       );
 
         if ($this->DEBUG) {
-        	$this->LOG[]=sprintf($__('Looking for tickets with query: %s'), $sql);
+            $this->LOG[]=sprintf($__('Looking for tickets with query: %s'), $sql);
         }
 
         $r = db_query($sql);
@@ -404,14 +402,16 @@ class CloserPlugin extends Plugin {
      * @param TicketStatus $new_status
      * @param string $admin_reply
      */
-    function post_reply(Ticket $ticket, TicketStatus $new_status, $admin_reply, Staff $robot = null) {
+    function post_reply(Ticket $ticket, TicketStatus $new_status, $admin_reply, Staff|int $robot = null) {
         // We need to override this for the notifications
         global $thisstaff;
-	    list ($__, $_N) = self::translate('closer');
+        list ($__, $_N) = self::translate('closer');
 
-        if ($robot) {
+        if ($robot instanceof Staff) {
             $assignee = $robot;
-        } else {
+        } elseif($robot == -2) { // send as system
+            $assignee = null;
+        } else {                // send as assigned agent
             $assignee = $ticket->getAssignee();
             if (!$assignee instanceof Staff) {
                 // Nobody, or a Team was assigned, and we haven't been told to use a Robot account.
@@ -423,7 +423,7 @@ class CloserPlugin extends Plugin {
         }
         // This actually bypasses any authentication/validation checks..
         $thisstaff = $assignee;
-	
+
         // Replace any ticket variables in the message:
         $variables = [
             'recipient' => $ticket->getOwner()
@@ -450,10 +450,14 @@ class CloserPlugin extends Plugin {
         // Build an array of values to send to the ticket's postReply function
         // 'emailcollab' => FALSE // don't send notification to all collaborators.. maybe.. dunno.
         $vars = [
-		'reply-to' => 'all',
+            'reply-to' => 'all',
             'response' => $custom_reply
         ];
         $errors = [];
+
+        if(!$thisstaff) { // send as system
+            $vars['poster'] = $__('SYSTEM');
+        }
 
         // Send the alert without claiming the ticket on our assignee's behalf.
         if (!$sent = $ticket->postReply($vars, $errors, TRUE, FALSE)) {
@@ -578,7 +582,7 @@ PIECE;
             return FALSE;
         }
         if ($this->DEBUG) {
-        	$this->LOG[]=printf($__("Testing thread entry: %s : %s\n"), $entry->get('type'), $entry->get('title'));
+            $this->LOG[]=printf($__("Testing thread entry: %s : %s\n"), $entry->get('type'), $entry->get('title'));
         }
         if (isset($entry->model->ht['type'])) {
             if ($response && $entry->get('type') == 'R') {
@@ -621,11 +625,11 @@ PIECE;
      *
      */
     private function print2log() {
-    	 global $ost;
-    	 if (empty($this->LOG)) {return false;}
- 	 $msg='';
- 	 foreach($this->LOG as $key=>$value) {$msg.=$value."\n";}
-	 $ost->logWarning(self::PLUGIN_NAME, $msg, false);
+        global $ost;
+        if (empty($this->LOG)) {return false;}
+        $msg='';
+        foreach($this->LOG as $key=>$value) {$msg.=$value."\n";}
+        $ost->logWarning(self::PLUGIN_NAME, $msg, false);
          // reset LOG
          $this->LOG = [];
     }

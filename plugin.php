@@ -4,11 +4,11 @@ list($__, $_N) = Plugin::translate('closer');
 
 return array(
  'id' => 'clonemeagain:autocloser', # notrans
- 'version' => '3.3.3',
+ 'version' => '3.3.4',
  'name' => /* trans */ $__('Ticket Closer'),
- 'author' => 'clonemeagain@gmail.com',
+ 'author' => 'clonemeagain@gmail.com / jens@isohd.net',
  'description' => /* trans */ $__('Changes ticket statuses based on age.'),
- 'url' => 'https://github.com/clonemeagain/osticket-plugin-closer',
+ 'url' => 'https://github.com/JensEB/plugin-autocloser',
  'plugin' => 'class.CloserPlugin.php:CloserPlugin',
  'ost_version' => '1.17', # Require osTicket v1.17
 );
@@ -23,6 +23,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [3.3.4] - 2026-04-30
+### Added
+- now it's possible to send a reply as SYSTEM
+### Fixed
+- set debug vars vor every instance
 
 ## [3.3.3] - 2026-03-05
 ### Fixed
