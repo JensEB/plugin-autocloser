@@ -222,20 +222,28 @@ class CloserPlugin extends Plugin {
      * @return boolean
      */
     private function is_time_to_run(PluginConfig &$config) {
+        $calculate_date = $config->get('calculate-date');
+
+        // is time for "Day X of Month"?
+        if($calculate_date === 'd') {
+            $day  = (int) $config->get('day-of-month');
+            $time = (int) $config->get('time-of-day');
+            return $this->isDayOfMonthReached($day, $time);
+        }
+
         // We can store arbitrary things in the config, like, when we ran this last:
-        $last_run = $config->get('last-run');
+        $last_run = (int) $config->get('last-run');
         $now = Misc::dbtime(); // Never assume about time.. 
-        $config->set('last-run', $now);
 
         // assume a freqency of "Every Cron" means it is always overdue
         $next_run = 0;
 
         // Convert purge frequency to a comparable format to timestamps:
-        $fr=($config->get('frequency') > 0) ? $config->get('frequency') : 0;
-        if ($freq_in_config = (int) $fr) {
+        $frequency = (int) $config->get('frequency');
+        if (($fr=($frequency > 0) ? $frequency : 0)) {
             // Calculate when we want to run next, config hours into seconds,
             // plus the last run is the timestamp of the next scheduled run
-            $next_run = $last_run + ($freq_in_config * 3600);
+            $next_run = $last_run + ($fr * 3600);
         }
 
         // See if it's time to check old tickets
@@ -243,9 +251,41 @@ class CloserPlugin extends Plugin {
         // If we don't have a next_run, it's because we want it to run
         // If the next run is in the past, then we are overdue, so, lets go!
         if ($this->DEBUG || !$next_run || $now > $next_run) {
-            return TRUE;
+            $config->set('last-run', $now);
+            return true;
         }
-        return FALSE;
+        return false;
+    }
+
+    private function isDayOfMonthReached(int $day, int $time): bool {
+        global $cfg;
+
+        if ($day < 1)
+            return false;
+        elseif($day > 28)
+            $day = 28;
+
+        if($time > 1435) // 1435 = 24h - 5min
+            $time = 1435;
+
+        try {
+            $tz = $cfg ? $cfg->getDbTimezone() : null;
+            $dbtz = $tz ? new DateTimeZone($tz) : null;
+        } catch (Exception $e) {
+            $dbtz = null;
+        }
+        $now = new DateTimeImmutable('now', $dbtz);
+
+        // day 28 is last day of month
+        $targetDay = ($day === 28) ? (int) $now->format('t') : $day;
+        $currentDay = (int) $now->format('j');
+
+        if ($currentDay !== $targetDay)
+            return false;
+
+        $currentMinuteOfDay = ((int) $now->format('G')) * 60 + (int) $now->format('i');
+
+        return $currentMinuteOfDay >= $time;
     }
 
     /**
@@ -291,37 +331,51 @@ class CloserPlugin extends Plugin {
     private function find_ticket_ids(PluginConfig &$config) {
         list ($__, $_N) = self::translate('closer');
 
+        $whereFilter = $leftJoins = [];
+
         // Limit
         $max = (int) $config->get('purge-num') ?: 20;
+        if ($max < 1)
+            $max = 20;
 
         // Filter
 
         #### time span ###
         $cDates = [
+            'c' => 't.created',         // from ticket table
             'u' => 't.lastupdate',      // from ticket table
             'm' => 'th.lastmessage',    // from thread table
             'r' => 'th.lastresponse',   // from thread table
+            'd' => '1'                  // special handling for on day X
         ];
+
         $calculate_date = $config->get('calculate-date');
-        if(!in_array($calculate_date, ['u','m','r'])) $calculate_date = 'u';
-        $age_days = (int) $config->get('purge-age');
-        if ($age_days < 1) {
-            throw new \Exception($__('Invalid parameter (int) age_days needs to be > 0'));
-        } else {
+        $valid_calculate_dates = array_keys($cDates);
+
+        if(!in_array($calculate_date, $valid_calculate_dates))
+            throw new \Exception(sprintf($__('Invalid calculate date: (string) calculate-date needs to be: %s'),
+                                         implode(', ', $valid_calculate_dates) )
+                                );
+
+        if($calculate_date !== 'd') { // on day X = we do not need a time span
+            $age_days = (int) $config->get('purge-age');
+            if ($age_days < 1)
+                throw new \Exception($__('Invalid parameter (int) age_days needs to be > 0'));
+
             // do we need a left join?
-            $leftJoins = '';
             if(in_array($calculate_date, ['m','r']))
-                $leftJoins = sprintf(" LEFT JOIN `%s` th ON (t.ticket_id = th.object_id AND th.object_type = 'T') ", THREAD_TABLE);
-            $whereFilter = sprintf(' %s < DATE_SUB(NOW(), INTERVAL %d DAY)', $cDates[$calculate_date], $age_days);
+                $leftJoins[] = sprintf(" LEFT JOIN `%s` th ON (t.ticket_id = th.object_id AND th.object_type = 'T') ", THREAD_TABLE);
+            $whereFilter[] = sprintf(' %s < DATE_SUB(NOW(), INTERVAL %d DAY)', $cDates[$calculate_date], $age_days);
         }
 
         #### only answered ###
-        $whereFilter .= ($config->get('close-only-answered')) ? ' AND t.isanswered=1' : '';
+        if($config->get('close-only-answered'))
+            $whereFilter[] = 't.isanswered=1';
         #### only overdue ###
-        $whereFilter .= ($config->get('close-only-overdue'))
-                        // is overdue OR duedate is set and in the past OR duedate not set and est_duedate set and in the past
-                      ? ' AND (t.isoverdue=1 OR (duedate IS NOT NULL AND duedate < NOW()) OR (duedate IS NULL AND est_duedate < NOW()))'
-                      : '';
+        if($config->get('close-only-overdue')) {
+            // is overdue OR duedate is set and in the past OR duedate not set and est_duedate set and in the past
+            $whereFilter[] = '(t.isoverdue=1 OR (t.duedate IS NOT NULL AND t.duedate < NOW()) OR (t.duedate IS NULL AND t.est_duedate < NOW()))';
+        }
 
         ### help topic filter ###
         $help_topics_selector = $config->get('help-topic-selector'); // p=process, i=ignore
@@ -330,10 +384,10 @@ class CloserPlugin extends Plugin {
         if (is_array($help_topics) && count($help_topics)) {
             $topic_ids = array_filter(array_map('intval', array_keys($help_topics)));
             if (count($topic_ids)) {
-                $whereFilter .= sprintf(' AND t.topic_id %s (%s)',
-                                        $help_topics_selector === 'i' ? 'NOT IN' : 'IN',
-                                        implode(',', $topic_ids)
-                                       );
+                $whereFilter[] = sprintf('t.topic_id %s (%s)',
+                                         $help_topics_selector === 'i' ? 'NOT IN' : 'IN',
+                                         implode(',', $topic_ids)
+                                        );
             }
         }
 
@@ -344,23 +398,23 @@ class CloserPlugin extends Plugin {
         if (is_array($depts) && count($depts)) {
             $dept_ids = array_filter(array_map('intval', array_keys($depts)));
             if (count($dept_ids)) {
-                $whereFilter .= sprintf(' AND t.dept_id %s (%s)',
-                                        $department_selector === 'i' ? 'NOT IN' : 'IN',
-                                        implode(',', $dept_ids)
-                                       );
+                $whereFilter[] = sprintf('t.dept_id %s (%s)',
+                                         $department_selector === 'i' ? 'NOT IN' : 'IN',
+                                         implode(',', $dept_ids)
+                                        );
             }
         }
 
         ### status filter ###
         $from_status = $config->get('from-status');
         $from_status_ids = [];
-        if(!is_array($from_status) && (int) $from_status)
-            $from_status_ids[] = (int) $from_status;
-        elseif(is_array($from_status))
+        if(is_array($from_status))
             $from_status_ids = array_filter(array_map('intval', array_keys($from_status)));
-        // extract array keys as dept_ids, if departments selected
+        elseif((int) $from_status > 0)
+            $from_status_ids[] = (int) $from_status;
+        // extract selected status_ids
         if (count($from_status_ids)) {
-            $whereFilter .= sprintf(' AND t.status_id IN (%s)', implode(',', $from_status_ids));
+            $whereFilter[] = sprintf('t.status_id IN (%s)', implode(',', $from_status_ids));
         } else
             throw new \Exception("Invalid parameter (int) / (array) from_status needs to be > 0 or [> 0]");
 
@@ -375,8 +429,8 @@ class CloserPlugin extends Plugin {
 
         $sql = sprintf("SELECT t.ticket_id FROM %s %s WHERE %s ORDER BY t.ticket_id ASC LIMIT %d",
                        TICKET_TABLE.' t',
-                       $leftJoins,
-                       $whereFilter,
+                       implode(' ', $leftJoins),
+                       implode(' AND ', $whereFilter),
                        $max
                       );
 

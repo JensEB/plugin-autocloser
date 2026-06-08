@@ -40,18 +40,15 @@ class CloserPluginConfig extends PluginConfig {
 	            return FALSE;
 	        }
 	
-            if (isset($config['purge-age']) &&
-                    !is_numeric($config['purge-age'])) {
-                $errors['err'] = $__(
-                        'Max Ticket age only supports numeric values.');
-                return FALSE;
-            }
-            $robotAccount = intval($config['robot-account'] ?? 0);
-            $adminReply = intval($config['admin-reply'] ?? 0);
-            if (!$robotAccount && $adminReply > 0) {
-                $errors['err'] = $__('Please choose a robot-account.');
-                return FALSE;            	
-            }
+        if (   ($config['calculate-date'] ?? null) !== 'd'
+            && (   !isset($config['purge-age'])
+                || !is_numeric($config['purge-age'])
+                || (int) $config['purge-age'] < 1
+               )
+           ) {
+            $errors['err'] = $__('Max Ticket age only supports positive numeric values.');
+            return false;
+        }
 
         return TRUE;
     }
@@ -128,21 +125,37 @@ class CloserPluginConfig extends PluginConfig {
         $responses['-1'] = $__('Send no Reply');
         ksort($responses);
 
+        $dayOfMonth = [1 => $__('First Day of Month')];
+        for ($i=2; $i <= 27; $i++)
+            $dayOfMonth[$i] = sprintf($__('Day %s of Month'), $i);
+        $dayOfMonth[28] = $__('Last Day of Month');
+
+        // Build array for hours 0-23 in steps of 5 minutes
+        $executionTimes = [];
+        for ($i = 0; $i <= 23; $i++) {
+            for ($min = 0; $min < 60; $min+=5) {
+                $time_key = $i * 60 + $min;
+                $executionTimes[$time_key] = sprintf('%02d:%02d', $i, $min);
+            }
+        }
+
         // Build a group configuration:
         $config_group = [];
 
         $config_group[] = [
-            'filter' => new SectionBreakField(
+            'time' => new SectionBreakField(
                     [
-                'label' => $__('Filter Config')
+                'label' => $__('Time of Execution')
                     ]),
             'calculate-date' => new ChoiceField(
                     [
                 'label' => $__('Calculate from date'),
                 'choices' => [
+                    'c'=>__('Create Date'),
                     'u'=>__('Last Update'),
                     'm'=>__('Last Message'),
-                    'r'=>__('Last Response')
+                    'r'=>__('Last Response'),
+                    'd'=>$__('Day X of Month')
                 ],
                 'default' => 'u',
                 'hint' => $__('From which date should the calculation begin?')
@@ -151,9 +164,30 @@ class CloserPluginConfig extends PluginConfig {
                     [
                 'default' => '999',
                 'label' => $__('Max Ticket age in days'),
-                'hint' => $__('Tickets whose date is before the specified days will match and have their status changed.'),
+                'hint' => sprintf('%s (%s)',
+                                  $__('Tickets whose date is before the specified days will match and have their status changed.'),
+                                  $__('Not used, if „Calculate from date“ is set to „Day X of Month“')
+                          ),
                 'size' => 5,
                 'length' => 4
+                    ]),
+            'day-of-month' => new ChoiceField(
+                    [
+                'label' => $__('Day of Month'),
+                'choices' => $dayOfMonth,
+                'default' => 1,
+                'hint' => $__('Only used, if „Calculate from date“ is set to „Day X of Month“')
+                    ]),
+            'time-of-day' => new ChoiceField(
+                    [
+                'label' => $__('Time of Selected Day'),
+                'choices' => $executionTimes,
+                'default' => 60,
+                'hint' => $__('Only used, if „Calculate from date“ is set to „Day X of Month“')
+                    ]),
+            'filter' => new SectionBreakField(
+                    [
+                'label' => $__('Filter Config')
                     ]),
             'close-only-answered' => new BooleanField(
                     [
