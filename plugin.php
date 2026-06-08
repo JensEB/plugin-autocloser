@@ -4,7 +4,7 @@ list($__, $_N) = Plugin::translate('closer');
 
 return array(
  'id' => 'clonemeagain:autocloser', # notrans
- 'version' => '3.3.4',
+ 'version' => '3.4.0',
  'name' => /* trans */ $__('Ticket Closer'),
  'author' => 'clonemeagain@gmail.com / jens@isohd.net',
  'description' => /* trans */ $__('Changes ticket statuses based on age.'),
@@ -23,6 +23,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [3.4.0] - 2026-06-03
+### Added
+- now it's possible to select ticket's create date as calculate from date
+- now it's possible to select a fixed day of Month to trigger this instance for execution
+- config pre-save checks
+  -> purge-num must be a positive integer
+  -> The target status must not be included in the status filter list
+### Fixed
+- some cleaning and hardening tasks
+  -> bootstrap() - remove unused $instance var
+  -> cron run: ensure, admin-reply is an integer
+               make robot-account var save
+  -> post_reply() - make $thisstaff changes temporary
+  -> render_thread_entry() make correct html
 
 ## [3.3.4] - 2026-04-30
 ### Added
