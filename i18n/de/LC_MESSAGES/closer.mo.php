@@ -34,7 +34,7 @@ return [
 
     // config.php
     'Auto-closed for being open too long with no updates.' => 'Wurde automatisch geschlossen, weil es zu lange geöffnet war, ohne dass Aktualisierungen vorgenommen wurden.',
-    'Only a numeric value is valid for Purge Number.' => 'Für die Anzahl der zu bearbeitenden Tickets ist nur ein numerischer Wert gültig.',
+    'Only a positive numeric value is valid for Purge Number.' => 'Für die Anzahl der zu bearbeitenden Tickets ist nur ein positiver numerischer Wert gültig.',
     'Max Ticket age only supports positive numeric values.' => 'Das maximale Ticketalter unterstützt nur positive numerische Werte.',
     'Please choose a robot-account.' => 'Bitte wählen Sie ein Roboter-Konto.',
     'Please choose an admin-reply.' => 'Bitte wählen Sie eine Adminantwort aus.',

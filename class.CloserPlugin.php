@@ -66,12 +66,10 @@ class CloserPlugin extends Plugin {
         // ---------------------------------------------------------------------
         // Fetch the config
         // ---------------------------------------------------------------------
-        // Save config and instance for use later in the signal, when it is called
         $config = $this->config;
-        $instance = $this->config->instance;
 
         // Listen for cron Signal, which only happens at end of class.cron.php:
-        Signal::connect('cron', function ($ignored, $data) use (&$config, $instance) {
+        Signal::connect('cron', function ($ignored, $data) use (&$config) {
 
             // set debug mode (reset debug vars)
             $this->DEBUG = (bool) $config->get('debug-mode-enabled');
@@ -109,7 +107,7 @@ class CloserPlugin extends Plugin {
                 $this->LOG[]=sprintf($__('%s tickets matched the criterias.'), count($open_ticket_ids));
             }
 
-            // Bail if there is no work to do
+            // Bail out if there is no work to do
             if (!count($open_ticket_ids)) {
                 if ($this->DEBUG)
                     $this->print2log();
@@ -131,9 +129,9 @@ class CloserPlugin extends Plugin {
 
             // Fetch the actual content of the reply, "html" means load with images, 
             // I don't think it works with attachments though.
-            $admin_reply_config = $config->get('admin-reply');
+            $admin_reply_config = (int) $config->get('admin-reply');
             $admin_reply = null;
-            if (is_numeric($admin_reply_config) && $admin_reply_config) {
+            if ($admin_reply_config > 0) {
                 // We have a valid Canned_Response ID, fetch the actual Canned:
                 if (   ($admin_reply_config = Canned::lookup($admin_reply_config))
                     && $admin_reply_config instanceof Canned
@@ -149,7 +147,7 @@ class CloserPlugin extends Plugin {
 
             // Get the robot for this config
             $robot_config = (int) $config->get('robot-account');
-            $robot = ($robot_config > 0) ? Staff::lookup($robot_config) : $robot_config;
+            $robot = ($robot_config > 0) ? (Staff::lookup($robot_config)?:null) : $robot_config;
 
             // Go through each ticket ID:
             foreach ($open_ticket_ids as $ticket_id) {
@@ -456,7 +454,7 @@ class CloserPlugin extends Plugin {
      * @param TicketStatus $new_status
      * @param string $admin_reply
      */
-    function post_reply(Ticket $ticket, TicketStatus $new_status, $admin_reply, Staff|int $robot = null) {
+    function post_reply(Ticket $ticket, TicketStatus $new_status, $admin_reply, Staff|int|null $robot = null) {
         // We need to override this for the notifications
         global $thisstaff;
         list ($__, $_N) = self::translate('closer');
@@ -476,46 +474,51 @@ class CloserPlugin extends Plugin {
             }
         }
         // This actually bypasses any authentication/validation checks..
-        $thisstaff = $assignee;
+        $realThisstaff = $thisstaff ?? null;
+        try {
+            $thisstaff = $assignee;
 
-        // Replace any ticket variables in the message:
-        $variables = [
-            'recipient' => $ticket->getOwner()
-        ];
+            // Replace any ticket variables in the message:
+            $variables = [
+                'recipient' => $ticket->getOwner()
+            ];
 
-        // Provide extra variables.. because. :-)
-        $options = [
-            'wholethread' => 'fetch_whole_thread',
-            'firstresponse' => 'fetch_first_response',
-            'lastresponse' => 'fetch_last_response'
-        ];
+            // Provide extra variables.. because. :-)
+            $options = [
+                'wholethread' => 'fetch_whole_thread',
+                'firstresponse' => 'fetch_first_response',
+                'lastresponse' => 'fetch_last_response'
+            ];
 
-        // See if they've been used, if so, call the function
-        foreach ($options as $option => $method) {
-            if (strpos($admin_reply, $option) !== FALSE) {
-                $variables[$option] = $this->{$method}($ticket);
+            // See if they've been used, if so, call the function
+            foreach ($options as $option => $method) {
+                if (strpos($admin_reply, $option) !== FALSE) {
+                    $variables[$option] = $this->{$method}($ticket);
+                }
             }
-        }
 
-        // Use the Ticket objects own replaceVars method, which replace
-        // any other Ticket variables.
-        $custom_reply = $ticket->replaceVars($admin_reply, $variables);
+            // Use the Ticket objects own replaceVars method, which replace
+            // any other Ticket variables.
+            $custom_reply = $ticket->replaceVars($admin_reply, $variables);
 
-        // Build an array of values to send to the ticket's postReply function
-        // 'emailcollab' => FALSE // don't send notification to all collaborators.. maybe.. dunno.
-        $vars = [
-            'reply-to' => 'all',
-            'response' => $custom_reply
-        ];
-        $errors = [];
+            // Build an array of values to send to the ticket's postReply function
+            // 'emailcollab' => FALSE // don't send notification to all collaborators.. maybe.. dunno.
+            $vars = [
+                'reply-to' => 'all',
+                'response' => $custom_reply
+            ];
+            $errors = [];
 
-        if(!$thisstaff) { // send as system
-            $vars['poster'] = $__('SYSTEM');
-        }
+            if(!$thisstaff) { // send as system
+                $vars['poster'] = $__('SYSTEM');
+            }
 
-        // Send the alert without claiming the ticket on our assignee's behalf.
-        if (!$sent = $ticket->postReply($vars, $errors, TRUE, FALSE)) {
-            $ticket->LogNote($__('Error Notification'), $__('We were unable to post a reply to the ticket creator.'), self::PLUGIN_NAME, FALSE);
+            // Send the alert without claiming the ticket on our assignee's behalf.
+            if (!$sent = $ticket->postReply($vars, $errors, TRUE, FALSE)) {
+                $ticket->LogNote($__('Error Notification'), $__('We were unable to post a reply to the ticket creator.'), self::PLUGIN_NAME, FALSE);
+            }
+        } finally {
+            $thisstaff = $realThisstaff;
         }
     }
 
@@ -601,16 +604,17 @@ class CloserPlugin extends Plugin {
         list ($__, $_N) = self::translate('closer');
 
         $from = ($entry->get('type') == 'R') ? $__('Sent Date') : $__('Received Date');
-        $tag = ($entry->get('format') == 'text') ? 'pre' : 'p';
+        $tag = ($entry->get('format') == 'text') ? 'pre' : 'div';
         $when = Format::datetime(strtotime($entry->get('created')));
-        // TODO: Maybe make this a CannedResponse or admin template? 
+        // TODO: Maybe make this a CannedResponse or admin template?
+        $title = Format::htmlchars($entry->get('title'));
         return <<<PIECE
 <hr />
-<p class="thread">
-  <h3>{$entry->get('title')}</h3>
+<div class="thread">
+  <h3>$title</h3>
   <p>$from: $when</p>
-  <$tag>{$entry->get('body')}</$tag>
-</p>
+  <$tag>{$entry->model->getBody()}</$tag>
+</div>
 PIECE;
     }
 
@@ -636,7 +640,7 @@ PIECE;
             return FALSE;
         }
         if ($this->DEBUG) {
-            $this->LOG[]=printf($__("Testing thread entry: %s : %s\n"), $entry->get('type'), $entry->get('title'));
+            $this->LOG[]=sprintf($__("Testing thread entry: %s : %s\n"), $entry->get('type'), $entry->get('title'));
         }
         if (isset($entry->model->ht['type'])) {
             if ($response && $entry->get('type') == 'R') {

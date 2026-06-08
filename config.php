@@ -34,11 +34,12 @@ class CloserPluginConfig extends PluginConfig {
         list ($__, $_N) = self::translate();
 
         // Validate the free-text fields of numerical configurations are in fact numerical..
-        if (isset($config['purge-num']) &&
-	        !is_numeric($config['purge-num'])) {
-	            $errors['err'] = $__('Only a numeric value is valid for Purge Number.');
-	            return FALSE;
-	        }
+        if (   isset($config['purge-num'])
+            && (!is_numeric($config['purge-num']) || (int) $config['purge-num'] < 1)
+           ) {
+            $errors['err'] = $__('Only a positive numeric value is valid for Purge Number.');
+            return false;
+        }
 	
         if (   ($config['calculate-date'] ?? null) !== 'd'
             && (   !isset($config['purge-age'])
@@ -50,7 +51,25 @@ class CloserPluginConfig extends PluginConfig {
             return false;
         }
 
-        return TRUE;
+        // force from-status != to-status
+        $toStatus = (int) (($config['to-status'] ?? 3) ?: 3);  // default = 3
+        $fromStatus = ($config['from-status'] ?? 1) ?: 1;      // default = 1
+        if(!is_array($fromStatus))
+            $fromStatus = [$fromStatus];
+        $fromStatusIds = array_filter(array_map('intval', array_keys($fromStatus)));
+        if (in_array($toStatus, $fromStatusIds, true)) {
+            $errors['err'] = $__('The target status must not be included in the status filter list');
+            return false;
+        }
+
+        $robotAccount = intval($config['robot-account'] ?? 0);
+        $adminReply = intval($config['admin-reply'] ?? 0);
+        if (!$robotAccount && $adminReply > 0) {
+            $errors['err'] = $__('Please choose a robot-account.');
+            return false;            	
+        }
+
+        return true;
     }
 
     /**
@@ -261,7 +280,7 @@ class CloserPluginConfig extends PluginConfig {
                 'label' => $__('From Status'),
                 'choices' => $statuses,
                 'configuration' => ['multiselect' => true],
-                'default' => 1,
+                'default' => 1, // 1 == open
                 'hint' => $__(
                         'When we change the ticket, what are we changing the status from? Default is "Open"')
                     ]),
@@ -273,7 +292,7 @@ class CloserPluginConfig extends PluginConfig {
                     [
                 'label' => $__('To Status'),
                 'choices' => $statuses,
-                'default' => 3, // 3 == Open on mine.
+                'default' => 3, // 3 == closed.
                 'hint' => $__(
                         'When we change the ticket, what are we changing the status to? Default is "Closed"')
                     ]),
